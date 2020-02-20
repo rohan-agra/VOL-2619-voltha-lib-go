@@ -111,7 +111,7 @@ type Logger interface {
 	V(l int) bool
 
 	//Returns the log level of this specific logger
-	GetLogLevel() LogLevel
+	GetLogLevel() (LogLevel, error)
 }
 
 // Fields is used as key-value pairs for structured logging
@@ -161,20 +161,20 @@ func logLevelToLevel(l LogLevel) zc.Level {
 	return zc.ErrorLevel
 }
 
-func levelToLogLevel(l zc.Level) LogLevel {
+func levelToLogLevel(l zc.Level) (LogLevel, error) {
 	switch l {
 	case zc.DebugLevel:
-		return DebugLevel
+		return DebugLevel, nil
 	case zc.InfoLevel:
-		return InfoLevel
+		return InfoLevel, nil
 	case zc.WarnLevel:
-		return WarnLevel
+		return WarnLevel, nil
 	case zc.ErrorLevel:
-		return ErrorLevel
+		return ErrorLevel, nil
 	case zc.FatalLevel:
-		return FatalLevel
+		return FatalLevel, nil
 	}
-	return ErrorLevel
+	return ErrorLevel, errors.New("Invalid LogLevel")
 }
 
 func StringToLogLevel(l string) (LogLevel, error) {
@@ -392,14 +392,22 @@ func GetPackageLogLevel(packageName ...string) (LogLevel, error) {
 		name, _, _, _ = getCallerInfo()
 	}
 	if cfg, ok := cfgs[name]; ok {
-		return levelToLogLevel(cfg.Level.Level()), nil
+		if logLevel, err := levelToLogLevel(cfg.Level.Level()); err != nil {
+			return 0, err
+		} else {
+			return logLevel, nil
+		}
 	}
 	return 0, fmt.Errorf("unknown-package-%s", name)
 }
 
 //GetDefaultLogLevel gets the log level used for packages that don't have specific loggers
-func GetDefaultLogLevel() LogLevel {
-	return levelToLogLevel(cfg.Level.Level())
+func GetDefaultLogLevel() (LogLevel, error) {
+	if logLevel, err := levelToLogLevel(cfg.Level.Level()); err != nil {
+		return 0, err
+	} else {
+		return logLevel, nil
+	}
 }
 
 //SetLogLevel sets the log level for the logger corresponding to the caller's package
@@ -648,8 +656,12 @@ func (l logger) V(level int) bool {
 }
 
 // GetLogLevel returns the current level of the logger
-func (l logger) GetLogLevel() LogLevel {
-	return levelToLogLevel(cfgs[l.packageName].Level.Level())
+func (l logger) GetLogLevel() (LogLevel, error) {
+	if logLevel, err := levelToLogLevel(cfgs[l.packageName].Level.Level()); err != nil {
+		return 0, err
+	} else {
+		return logLevel, nil
+	}
 }
 
 // With returns a logger initialized with the key-value pairs
@@ -783,6 +795,6 @@ func V(level int) bool {
 }
 
 //GetLogLevel returns the log level of the invoking package
-func GetLogLevel() LogLevel {
+func GetLogLevel() (LogLevel, error) {
 	return getPackageLevelLogger().GetLogLevel()
 }
